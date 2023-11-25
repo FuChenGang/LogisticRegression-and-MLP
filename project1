@@ -27,18 +27,7 @@ class LogisticRegression:
             target_type.add(i)
         target_type = list(target_type)
         self.target_type = target_type#记录
-        c = len(target)
-        b = 0
-        outcome = []
-        while b < c:
-            m = 0
-            while m < 2:
-                if target[b] == target_type[m]:
-                    outcome.append(target_type[m])
-                    break
-                m = m+1
-            b = b + 1
-        return 
+
     
     
 
