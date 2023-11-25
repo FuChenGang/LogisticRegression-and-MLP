@@ -63,17 +63,16 @@ class LogisticRegression:
             print(f"\nloss{terminate}:",loss)
             k = 0
             print('np.sum((-y + t)* x[:0]):',np.sum((-y + t)* x[:,0]))
-            regulazation = 100000*self.w[0]
-            print('正则项：',regulazation)
             while k < len(self.w):
                     #derivative_matrix[k][i] = np.sum((y[:,k]-self.target_proccessed[:,k])* x_matrix[:,i]) +  self.w[k][i]#正则项
-                derivative[k] = np.sum(((y-1) + t)* x[:,k])   #+ regulazation#正则化
+                regulazation = 10000*self.w[k]
+                derivative[k] = np.sum(((y-1) + t)* x[:,k])   + regulazation#正则化
                 k = k + 1
             #参数更新：
             self.w = self.w - self.learning_rate * derivative
             terminate = terminate + 1
             print("迭代次数:",terminate)
-            if terminate >= 2:#最大训练次数
+            if terminate >= 200:#最大训练次数
                 return 
     
     def loss(self,y,t):
@@ -116,14 +115,29 @@ for i in target:
     else:
         target[a] = 1
     a = a + 1
-MLP = LogisticRegression(x,target,0.000002)
+MLP = LogisticRegression(x,target,0.0000002)
 MLP.train(x,target)
 y = MLP.predict(x)
 print("训练集的预测值：\n",y)
 a = y - target
-
-
 wrong_number = np.sum(np.absolute(a))
 print("训练集的错误个数:",wrong_number)
 print("对于训练集的预测准确率：",(len(target)-wrong_number) / len(target))
 
+filepath2 = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\optdigits.tes"
+data = np.loadtxt(filepath2,dtype = int,delimiter=',')
+x = data[:,0:-1]
+target = data[:,-1]
+a = 0
+for i in target:
+    if i < 5 :
+        target[a] = 0
+    else:
+        target[a] = 1
+    a = a + 1
+y = MLP.predict(x)
+print("测试集的预测值：\n",y)
+a = y - target
+wrong_number = np.sum(np.absolute(a))
+print("测试集的错误个数:",wrong_number)
+print("对于测试集的预测准确率：",(len(target)-wrong_number) / len(target))
