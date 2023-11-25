@@ -8,9 +8,12 @@ class MLP:
     hidden_layer_number = None
     the_number_of_units_in_each_layer = None
     
-
-    f = lambda y:  1/(1+np.exp(-y))#sigmod激活函数
-    g = lambda x: np.exp(x)/np.square(1+np.exp(-x))#sigmod导数
+    def sigmod(self,x):
+        return  1/(1+np.exp(-x))
+    def sigmod_derivatiwve(self,x):
+        return np.exp(x)/np.square(1+np.exp(-x))
+    #sigmod = lambda x:  1/(1+np.exp(-x))#sigmod激活函数
+    # sigmod_derivatiwve = lambda x:np.exp(x)/np.square(1+np.exp(-x))#sigmod导数
     
 
 
@@ -37,8 +40,9 @@ class MLP:
             w_matrix = np.zeros(feature_number + 1)
             self.w.append(w_matrix)
         else:
-            w_matrix = np.zeros(hidden_layer_number[-1] + 1)
+            w_matrix = np.zeros(the_number_of_units_in_each_layer[-1] + 1)
             self.w.append(w_matrix)
+        print('w:',self.w)
 
         
         
@@ -58,9 +62,80 @@ class MLP:
         target_type = list(target_type)
         self.target_type = target_type#记录
 
-    # def hidden_layer(self,x,w_matrix):#激活函数为sigmod函数的隐藏层
-    #     x = self.data_proccessed_x(x)
-#
+    def hidden_layer(self,x,w_matrix):#激活函数为sigmod函数的隐藏层,w_matrix为(feature+1)*unit_number
+        x_matrix = self.data_proccessed_x(x)#x为n个样本*(feature + 1)
+        z_matrix = x_matrix.dot(w_matrix)#对x线性变换后（n个样本） * （unit_number)
+        
+        y_matrix = self.sigmod(z_matrix)
+        y_derivative_of_z = self.sigmod_derivatiwve(z_matrix)
+
+        print('z:',z_matrix)
+
+
+
+        z_derivative_of_x_matrix = []
+        z_ki_derivative_of_x_matrix = x_matrix.copy()
+        aa = z_matrix.shape[0]
+        bb = z_matrix.shape[1]
+        cc = x_matrix.shape[0]
+        dd = x_matrix.shape[1]
+        k = 0
+        while k < aa:
+            i = 0
+            z1 = []
+            while i < bb :
+                m = 0
+                while m < cc:
+                    n = 0
+                    while n < dd:
+                        if m != k :
+                            z_ki_derivative_of_x_matrix[m][n] = 0
+                        else:
+                            z_ki_derivative_of_x_matrix[m][n] = w_matrix[n][i]
+                        n = n + 1
+                    m = m + 1
+                y_derivative_of_x_matrix =  z_ki_derivative_of_x_matrix * y_derivative_of_z[k][i]
+                z1.append(y_derivative_of_x_matrix)
+                i = i + 1
+            z_derivative_of_x_matrix.append(z1)
+            k = k + 1
+        y_derivative_of_x_matrix = np.array(z_derivative_of_x_matrix)#数列转回数组
+
+
+        z_derivative_of_w_matrix = []
+        z_ki_derivative_of_w_matrix = w_matrix.copy()
+        aa = z_matrix.shape[0]
+        bb = z_matrix.shape[1]
+        cc = w_matrix.shape[0]
+        dd = w_matrix.shape[1]
+        k = 0
+        while k < aa:
+            i = 0
+            z1 = []
+            while i < bb :
+                m = 0
+                while m < cc:
+                    n = 0
+                    while n < dd:
+                        if n != i :
+                            z_ki_derivative_of_w_matrix[m][n] = 0
+                        else:
+                            # print(f'm:{m},n:{n},k:{k}')
+                            # print(f'x_matrix:{x_matrix}\nw_matrix{w_matrix}\nz_matrix{z_matrix}')
+                            z_ki_derivative_of_w_matrix[m][n] = x_matrix[k][m]
+                        n = n + 1
+                    m = m + 1
+                y_derivative_of_w_matrix =  z_ki_derivative_of_w_matrix * y_derivative_of_z[k][i]
+                z1.append(y_derivative_of_w_matrix)
+                i = i + 1
+            z_derivative_of_w_matrix.append(z1)
+            k = k + 1
+        y_derivative_of_w_matrix = np.array(y_derivative_of_w_matrix)#数列转回数组
+        return([y_matrix,y_derivative_of_w_matrix,y_derivative_of_x_matrix])
+        
+
+        
+
     
     
 
@@ -98,9 +173,9 @@ class MLP:
                 return 
     
     def loss(self,y,t):
-        print('\ny:',y)
+        
         loss = -np.sum(t * np.log(1-y))/len(y)-np.sum((1-t) * np.log(y))/len(y)
-        print("loss:::::",loss)
+        
         return loss
     
 
@@ -119,10 +194,10 @@ class MLP:
             
 
         
-    
 
 
-filepath = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\optdigits.tra"
+
+filepath = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\新建 文本文档.txt"
 data = np.loadtxt(filepath,dtype = int,delimiter=',')
 x = data[:,0:-1]
 target = data[:,-1]
@@ -133,13 +208,15 @@ for i in target:
     else:
         target[a] = 1
     a = a + 1
-MLP = MLP(0,[],64,0.0000002)
+MLP = MLP(1,[2],2,0.0000002)
 
-MLP.train_output_layer(x,target)
+#MLP.train_output_layer(x,target)
+MLP.hidden_layer(x,MLP.w[0])
 
-y = MLP.predict(x)
-print("训练集的预测值：\n",y)
-a = y - target
+
+#y = MLP.predict(x)
+#print("训练集的预测值：\n",y)
+#a = y - target
 wrong_number = np.sum(np.absolute(a))
 print("训练集的错误个数:",wrong_number)
 print("对于训练集的预测准确率：",(len(target)-wrong_number) / len(target))
