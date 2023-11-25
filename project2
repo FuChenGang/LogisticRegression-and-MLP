@@ -4,6 +4,7 @@ class MLP:
     w = None
     target_type = None
     learning_rate = 0
+    target_proccessed = None
 
     hidden_layer_number = None
     the_number_of_units_in_each_layer = None
@@ -59,19 +60,41 @@ class MLP:
         target_type = set()
         for i in target:
             target_type.add(i)
+            if len(target_type) == 2:
+                break
         target_type = list(target_type)
+        a = 0
+        for i in target:
+            if target_type[0] == i:
+                target[a] = 0
+            else:
+                target[a] = 1
+        self.target_proccessed = target
         self.target_type = target_type#记录
 
     def train(self,x,target):
         a = 0
-        data = []
+        #fp：并记录过程中的导数在data列表中
+        data = []#多少层就存多少个列表，每个列表有三个元素，分别对应该层的‘输出值，输出值关于w的导数，输出值关于x的导数
+        #（最后一层（输出层）对应error关于w、x的导数）[y_matrix , y_derivative_of_w_matrix , y_derivative_of_x_matrix]
         while a < self.hidden_layer_number:
             if a == 0:
                 data.append(self.hidden_layer(x,self.w[a]))
             else:
                 data.append(self.hidden_layer(data[a-1][0],self.w[a]))
             a = a + 1
-        self.train_output_layer(data[-1][0],target)
+        data.append(self.train_output_layer(data[-1][0],target))
+        #BP：
+        w_new = self.w.copy()
+        a  =  len(w_new)
+        b = 0
+        while b < a:
+            if b == 0:
+                w_new[-1] = w_new[-1] - self.learning_rate * data[-1][1]
+            else:
+                w_new[-1-b] 
+            b = b + 1
+
 
         
 
@@ -143,38 +166,42 @@ class MLP:
         return([y_matrix,y_derivative_of_w_matrix,y_derivative_of_x_matrix])
         
 
-    def train_output_layer(self,x,t):#输出层
+    def train_output_layer(self,x,t):#输出层（因为是二分类，所以输出层采用SIGMOD函数拟合概率）
         self.data_proccessed_target(t)
-        loss = math.inf
-        terminate = 0
+        error = math.inf
         x = self.data_proccessed_x(x)
-        derivative = np.zeros([len(self.w[-1])])
-        while loss > 0.05:#训练继续进行的条件
-            z_matrix = self.w[-1].dot(x.T)
-            z_matrix = z_matrix.T#转置 
-            y = 1/(1+np.exp(-z_matrix))
-            print('\nz_matrix:',z_matrix)
-            print('np.exp(-z_matrix):',np.exp(-z_matrix))
-            loss = self.loss(y,t)
-            print(f"\nloss{terminate}:",loss)
-            k = 0
-            print('np.sum((-y + t)* x[:0]):',np.sum((-y + t)* x[:,0]))
-            while k < len(self.w[-1]):
-                regulazation = 10000*self.w[-1][k]
-                derivative[k] = np.sum(((y-1) + t)* x[:,k])   + regulazation#正则化
-                k = k + 1
-            #参数更新：
-            self.w[-1] = self.w[-1] - self.learning_rate * derivative
-            terminate = terminate + 1
-            print("迭代次数:",terminate)
-            if terminate >= 100:#最大训练次数
-                return 
+        w = self.w[-1]
+        error_derivative_of_w = np.zeros([len(w)])
+        z_matrix = w.dot(x.T)
+        z_matrix = z_matrix.T#转置 
+        #y = 1/(1+np.exp(-z_matrix))
+        y = self.sigmod(z_matrix)
+        error_derivative_of_y = self.target_proccessed / (1-y) + (1 - self.target_proccessed) / y
+        y_derevative_of_z = self.sigmod_derivatiwve(z_matrix)
+
+        a = 0
+        y_derevative_of_x = []
+        while a < len(x):
+            y_derevative_of_x1 = w * y_derevative_of_z[a] * error_derivative_of_y[a]
+            y_derevative_of_x.append(y_derevative_of_x1)
+            a = a + 1
+        error_derivative_of_x = np.array(y_derevative_of_x)
+
+        error = self.error(np.array(y),np.array(self.target_proccessed))
+        k = 0
+        while k < len(w):
+            #regulazation = 10000*w[-1][k]
+            error_derivative_of_w[k] = np.sum(((y-1) + self.target_proccessed)* x[:,k])   #+ regulazation#正则化
+            k = k + 1
+        #参数更新：
+        self.w[-1] = w[-1] - self.learning_rate * error_derivative_of_w
+        return [y,error_derivative_of_w,error_derivative_of_x]
     
-    def loss(self,y,t):
+    def error(self,y,t):
         
-        loss = -np.sum(t * np.log(1-y))/len(y)-np.sum((1-t) * np.log(y))/len(y)
+        error = -np.sum(t * np.log(1-y))/len(y) - np.sum((1-t) * np.log(y))/len(y)
         
-        return loss
+        return error
     
 
 
