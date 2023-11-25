@@ -1,2 +1,129 @@
 import numpy as np
 import math
+class LogisticRegression:
+    w = None
+    target_type = None
+    x_train = None
+    learning_rate = 0
+
+
+    def __init__(self,x,t,learning_rate):
+        self.data_proccessed_target(t)
+        k = len(x[0])#k为x的feature数
+        self.x_train = x
+        self.w = np.zeros([k+1])#参数初始化为0
+        self.learning_rate = learning_rate
+
+
+    def data_proccessed_x(self,x):#将矩阵x拓展一列用来乘偏置项w0
+        a = x.shape
+        x_proccessed = np.ones([a[0],a[1]+1])
+        x_proccessed[:,1:] = x
+        return x_proccessed
+
+    def data_proccessed_target(self,target):
+        target_type = set()
+        for i in target:
+            target_type.add(i)
+        target_type = list(target_type)
+        self.target_type = target_type#记录
+        c = len(target)
+        b = 0
+        outcome = []
+        while b < c:
+            m = 0
+            while m < 2:
+                if target[b] == target_type[m]:
+                    outcome.append(target_type[m])
+                    break
+                m = m+1
+            b = b + 1
+        return 
+    
+    
+
+    def train(self,x,t):
+        self.__init__(x,t,self.learning_rate)
+        loss = math.inf
+        terminate = 0
+        x = self.data_proccessed_x(self.x_train)
+        derivative = np.zeros([len(self.w)])
+        while loss > 0.05:#训练继续进行的条件
+            
+            
+            z_matrix = self.w.dot(x.T)
+            z_matrix = z_matrix.T#转置 
+            y = 1/(1+np.exp(-z_matrix))
+            
+            print('\nz_matrix:',z_matrix)
+            print('np.exp(-z_matrix):',np.exp(-z_matrix))
+            
+            loss = self.loss(y,t)
+
+            print(f"\nloss{terminate}:",loss)
+            k = 0
+            print('np.sum((-y + t)* x[:0]):',np.sum((-y + t)* x[:,0]))
+            regulazation = 100000*self.w[0]
+            print('正则项：',regulazation)
+            while k < len(self.w):
+                    #derivative_matrix[k][i] = np.sum((y[:,k]-self.target_proccessed[:,k])* x_matrix[:,i]) +  self.w[k][i]#正则项
+                derivative[k] = np.sum(((y-1) + t)* x[:,k])   #+ regulazation#正则化
+                k = k + 1
+            #参数更新：
+            self.w = self.w - self.learning_rate * derivative
+            terminate = terminate + 1
+            print("迭代次数:",terminate)
+            if terminate >= 2:#最大训练次数
+                return 
+    
+    def loss(self,y,t):
+        print('\ny:',y)
+        loss = -np.sum(t * np.log(1-y))/len(y)-np.sum((1-t) * np.log(y))/len(y)
+        print("loss:::::",loss)
+        return loss
+    
+
+
+    def predict(self,x):
+        x_matrix = self.data_proccessed_x(x)
+        #print('w:',self.w)
+        z_matrix = self.w.dot(x_matrix.T)
+        #print('\nz_matrix:',z_matrix)
+        #print('np.exp(-z_matrix):',np.exp(-z_matrix))
+        y = 1/(1+np.exp(-z_matrix))#指数处理
+        #print('y:',y)
+        output = []
+        for i in y:
+            if i >= 0.5:
+                output.append(self.target_type[0])
+            else:
+                output.append(self.target_type[1])
+        return output
+            
+
+        
+    
+
+
+filepath = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\optdigits.tra"
+data = np.loadtxt(filepath,dtype = int,delimiter=',')
+x = data[:,0:-1]
+target = data[:,-1]
+a = 0
+for i in target:
+    if i < 5 :
+        target[a] = 0
+    else:
+        target[a] = 1
+    a = a + 1
+MLP = LogisticRegression(x,target,0.000002)
+MLP.train(x,target)
+y = MLP.predict(x)
+print("训练集的预测值：\n",y)
+a = y - target
+
+
+wrong_number = np.sum(np.absolute(a))
+print("训练集的错误个数:",wrong_number)
+print("对于训练集的预测准确率：",(len(target)-wrong_number) / len(target))
+
