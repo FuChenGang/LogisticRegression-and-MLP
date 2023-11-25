@@ -60,7 +60,7 @@ class MLP:
 
     # def hidden_layer(self,x,w_matrix):#激活函数为sigmod函数的隐藏层
     #     x = self.data_proccessed_x(x)
-
+#
     
     
 
