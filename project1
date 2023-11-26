@@ -11,7 +11,7 @@ class LogisticRegression:
         self.data_proccessed_target(t)
         k = len(x[0])#k为x的feature数
         self.x_train = x
-        self.w = np.zeros([k+1])#参数初始化为0
+        self.w = np.random.rand(k+1)#参数初始化为随机数【0,1）
         self.learning_rate = learning_rate
 
 
@@ -44,8 +44,9 @@ class LogisticRegression:
             z_matrix = z_matrix.T#转置 
             y = 1/(1+np.exp(-z_matrix))
             
-            print('\nz_matrix:',z_matrix)
-            print('np.exp(-z_matrix):',np.exp(-z_matrix))
+            # print(f'w:{self.w}\nx:{x}')
+            # print('\nz_matrix:',z_matrix)
+            # print('np.exp(-z_matrix):',np.exp(-z_matrix))
             
             loss = self.loss(y,t)
 
@@ -55,19 +56,24 @@ class LogisticRegression:
             while k < len(self.w):
                     #derivative_matrix[k][i] = np.sum((y[:,k]-self.target_proccessed[:,k])* x_matrix[:,i]) +  self.w[k][i]#正则项
                 regulazation = 10000*self.w[k]
-                derivative[k] = np.sum(((y-1) + t)* x[:,k])   + regulazation#正则化
+                derivative[k] = np.sum(((y-1) + t)* x[:,k])   #+ regulazation#正则化
                 k = k + 1
             #参数更新：
+                    #设置更新阈值：
+            derivative = np.where(derivative > 493000, 493000, derivative)
+            derivative = np.where(derivative < -491000, -491000, derivative)
+            derivative = np.where(abs(derivative) < 1/1001, 1/1001, derivative)
             self.w = self.w - self.learning_rate * derivative
             terminate = terminate + 1
             print("迭代次数:",terminate)
-            if terminate >= 200:#最大训练次数
+            print(f'w:{self.w}\nderivative:{derivative}')
+            if terminate >= 500:#最大训练次数
                 return 
     
     def loss(self,y,t):
-        print('\ny:',y)
+        #print('\ny:',y)
         loss = -np.sum(t * np.log(1-y))/len(y)-np.sum((1-t) * np.log(y))/len(y)
-        print("loss:::::",loss)
+        #print("loss:::::",loss)
         return loss
     
 
@@ -79,7 +85,7 @@ class LogisticRegression:
         #print('\nz_matrix:',z_matrix)
         #print('np.exp(-z_matrix):',np.exp(-z_matrix))
         y = 1/(1+np.exp(-z_matrix))#指数处理
-        #print('y:',y)
+        print('y:',y)
         output = []
         for i in y:
             if i >= 0.5:
@@ -94,17 +100,24 @@ class LogisticRegression:
 
 
 filepath = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\optdigits.tra"
+filepath = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\新建 文本文档.txt"
 data = np.loadtxt(filepath,dtype = int,delimiter=',')
 x = data[:,0:-1]
 target = data[:,-1]
-a = 0
-for i in target:
-    if i < 5 :
-        target[a] = 0
-    else:
-        target[a] = 1
-    a = a + 1
-MLP = LogisticRegression(x,target,0.0000002)
+# a = 0
+# for i in target:
+#     if i < 5 :
+#         target[a] = 0
+#     else:
+#         target[a] = 1
+#     a = a + 1
+# c = np.random.randint(low=0, high=5, size=(10, 3))
+# t = np.ones([20])
+# t[0:10] = np.zeros([10])
+# d = np.random.randint(low=5, high=9, size=(10, 3))
+# x = np.vstack((c,d))
+# target = t
+MLP = LogisticRegression(x,target,0.002)
 MLP.train(x,target)
 y = MLP.predict(x)
 print("训练集的预测值：\n",y)
@@ -113,20 +126,20 @@ wrong_number = np.sum(np.absolute(a))
 print("训练集的错误个数:",wrong_number)
 print("对于训练集的预测准确率：",(len(target)-wrong_number) / len(target))
 
-filepath2 = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\optdigits.tes"
-data = np.loadtxt(filepath2,dtype = int,delimiter=',')
-x = data[:,0:-1]
-target = data[:,-1]
-a = 0
-for i in target:
-    if i < 5 :
-        target[a] = 0
-    else:
-        target[a] = 1
-    a = a + 1
-y = MLP.predict(x)
-print("测试集的预测值：\n",y)
-a = y - target
-wrong_number = np.sum(np.absolute(a))
-print("测试集的错误个数:",wrong_number)
-print("对于测试集的预测准确率：",(len(target)-wrong_number) / len(target))
+# filepath2 = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\optdigits.tes"
+# data = np.loadtxt(filepath2,dtype = int,delimiter=',')
+# x = data[:,0:-1]
+# target = data[:,-1]
+# a = 0
+# for i in target:
+#     if i < 5 :
+#         target[a] = 0
+#     else:
+#         target[a] = 1
+#     a = a + 1
+# y = MLP.predict(x)
+# print("测试集的预测值：\n",y)
+# a = y - target
+# wrong_number = np.sum(np.absolute(a))
+# print("测试集的错误个数:",wrong_number)
+# print("对于测试集的预测准确率：",(len(target)-wrong_number) / len(target))

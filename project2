@@ -1,20 +1,25 @@
 import numpy as np
 import math
+from sklearn.preprocessing import StandardScaler
 class MLP:
     w = None
     target_type = None
     learning_rate = 0
     target_proccessed = None
-
+    err = None
     hidden_layer_number = None
     the_number_of_units_in_each_layer = None
+
+    def ReLu(self,x):#relu变种
+        return np.where(x<0,0.1*x,x)
+    def ReLu_derivative(self,x):
+        return np.where(x < 0 , -0.9 , 1)
     
     def sigmod(self,x):
         return  1/(1+np.exp(-x))
-    def sigmod_derivatiwve(self,x):
-        return np.exp(x)/np.square(1+np.exp(-x))
-    #sigmod = lambda x:  1/(1+np.exp(-x))#sigmod激活函数
-    # sigmod_derivatiwve = lambda x:np.exp(x)/np.square(1+np.exp(-x))#sigmod导数
+    def sigmod_derivative(self,x):
+        return np.exp(-x)/np.square(1+np.exp(-x))
+
     
 
 
@@ -29,21 +34,21 @@ class MLP:
             units_number = the_number_of_units_in_each_layer[a]
             
             if a == 0:
-                w_matrix = np.zeros([feature_number+1,units_number])#初始化学习参数为0
+                w_matrix = np.random.randn(feature_number+1,units_number)#初始化学习参数为随机值【0,1）
                 self.w.append(w_matrix)
             else:
                 units_number2 = the_number_of_units_in_each_layer[a-1]
-                w_matrix = np.zeros([units_number2 + 1,units_number])#初始化学习参数为0
+                w_matrix = np.random.randn(units_number2 + 1,units_number)#初始化学习参数为随机值【0,1）
                 self.w.append(w_matrix)
             a = a + 1
         #初始化学习参数为0:输出层
         if hidden_layer_number == 0:
-            w_matrix = np.zeros(feature_number + 1)
+            w_matrix = np.random.randn(feature_number + 1)#初始化学习参数为随机值【0,1）
             self.w.append(w_matrix)
         else:
-            w_matrix = np.zeros(the_number_of_units_in_each_layer[-1] + 1)
+            w_matrix = np.random.randn(the_number_of_units_in_each_layer[-1] + 1)#初始化学习参数为随机值【0,1）
             self.w.append(w_matrix)
-        print('w:',self.w)
+        #print('\n\nw初始值:',self.w)
 
         
         
@@ -55,6 +60,12 @@ class MLP:
         x_proccessed = np.ones([a[0],a[1]+1])
         x_proccessed[:,1:] = x
         return x_proccessed
+    
+    def data_proccessed_y(self,y):
+    #将矩阵w缩减一列用来做BP并返回处理后的矩阵
+        a = y.shape
+        y_proccessed = y[:,1:]
+        return y_proccessed
 
     def data_proccessed_target(self,target):
         target_type = set()
@@ -69,41 +80,152 @@ class MLP:
                 target[a] = 0
             else:
                 target[a] = 1
+            a = a + 1
         self.target_proccessed = target
         self.target_type = target_type#记录
 
-    def train(self,x,target):
+    def train_output_layer(self,x,t,terminate):#输出层（因为是二分类，所以输出层采用SIGMOD函数拟合概率）
+
+        self.data_proccessed_target(t)
+        error = math.inf
+        x = self.data_proccessed_x(x)
+        w = self.w[-1]
+        error_derivative_of_w = np.zeros([len(w)])
+        z_matrix = w.dot(x.T)
+        z_matrix = z_matrix.T#转置 
+        #y = 1/(1+np.exp(-z_matrix))
+        #print(f'x_matrix:{x}\nw_matrix{w}\nz_matrix{z_matrix}')
+        y = self.sigmod(z_matrix)
+        error_derivative_of_y = self.target_proccessed / (1-y) + (1 - self.target_proccessed) / y
+        y_derevative_of_z = self.sigmod_derivative(z_matrix)
+        
         a = 0
-        #fp：并记录过程中的导数在data列表中
-        data = []#多少层就存多少个列表，每个列表有三个元素，分别对应该层的‘输出值，输出值关于w的导数，输出值关于x的导数
-        #（最后一层（输出层）对应error关于w、x的导数）[y_matrix , y_derivative_of_w_matrix , y_derivative_of_x_matrix]
-        while a < self.hidden_layer_number:
-            if a == 0:
-                data.append(self.hidden_layer(x,self.w[a]))
-            else:
-                data.append(self.hidden_layer(data[a-1][0],self.w[a]))
+        y_derevative_of_x = []
+        while a < len(x):
+            y_derevative_of_x1 = w * y_derevative_of_z[a] * error_derivative_of_y[a]
+            y_derevative_of_x.append(y_derevative_of_x1)
             a = a + 1
-        data.append(self.train_output_layer(data[-1][0],target))
-        #BP：
-        w_new = self.w.copy()
-        a  =  len(w_new)
-        b = 0
-        while b < a:
-            if b == 0:
-                w_new[-1] = w_new[-1] - self.learning_rate * data[-1][1]
+        error_derivative_of_x = np.array(y_derevative_of_x)
+
+        error = self.error(np.array(y),np.array(self.target_proccessed))
+
+        self.err[0] = self.err[1]
+        self.err[1] = error
+        if terminate % 1 == 0:
+            print(f'error {terminate}:{error}')
+
+        k = 0
+        while k < len(w):
+            #regulazation = 10000*w[-1][k]
+            error_derivative_of_w[k] = np.sum(((y-1) + self.target_proccessed)* x[:,k])   #+ regulazation#正则化
+            k = k + 1
+        #参数更新：
+        self.w[-1] = self.w[-1] - self.learning_rate * error_derivative_of_w
+        
+        return [y,error_derivative_of_w,error_derivative_of_x]
+    
+
+    def train(self,x,target):
+        self.err = np.array([0,math.inf])
+        terminate = 0
+        while terminate < 500:
+        #while abs(self.err[0] - self.err[1]) > 0.000001:
+            a = 0
+            #fp：并记录过程中的导数在data列表中
+            data = []#多少层就存多少个列表，每个列表有三个元素，分别对应该层的‘输出值，输出值关于w的导数，输出值关于x的导数
+            #（最后一层（输出层）对应error关于w、x的导数）[y_matrix , y_derivative_of_w_matrix , y_derivative_of_x_matrix]
+            while a < self.hidden_layer_number:
+                if a == 0:
+                    data.append(self.hidden_layer(x,self.w[a]))
+                else:
+                    data.append(self.hidden_layer(data[a-1][0],self.w[a]))
+                a = a + 1
+            if a == 0:
+                data.append(self.train_output_layer(x,target,terminate))
             else:
-                w_new[-1-b] 
-            b = b + 1
+                data.append(self.train_output_layer(data[-1][0],target,terminate))
+
+
+            #BP：
+            error_deri_of_x_bp = None
+            w_new = self.w.copy()
+            a  =  len(w_new)
+            b = 0
+            while b < a:
+                if b == 0:#输出层
+                    de = data[-1][1]
+                    #设置更新阈值：
+                    de = np.where(de > 493, 493, de)
+                    de = np.where(de < -491, -491, de)
+                    # de = np.where(de < 1/10001 and de > 0, 1/10001, de)
+                    # de = np.where(de > -1/10001 and de < 0, -1/10001, de)
+                    #w_new[-1] = w_new[-1] - self.learning_rate * de
+                   
+                    error_deri_of_x_bp = data[-1][2]
+                else:#隐藏层
+                    fir = error_deri_of_x_bp
+                    derict = data[-1-b][1]
+                    a1 = np.shape(w_new[-1-b] )[0]
+                    a2 = np.shape(w_new[-1-b] )[1]
+                    m = 0
+                    derivative_matrix_w = w_new[-1-b].copy()
+                    while m < a1:
+                        n = 0
+                        while n < a2:
+                            derivative = np.sum(self.data_proccessed_y(fir) * derict[:,:,m,n] )
+                            #print(f'self.data_proccessed_y(fir):{self.data_proccessed_y(fir)}\nderict[:,:,m,n]{derict[:,:,m,n]}')
+                            derivative_matrix_w[m][n] = derivative
+                            n = n + 1
+                        m = m + 1
+                #设置更新阈值：
+                    #derivative_matrix_w *= np.exp(10*b)
+                    derivative_matrix_w = np.where(derivative_matrix_w > 49300, 49300, derivative_matrix_w)
+                    derivative_matrix_w = np.where(derivative_matrix_w < -49401, -49401, derivative_matrix_w)
+                    #derivative_matrix_w = np.where((derivative_matrix_w < 1/1001) and (derivative_matrix_w > 0), 1/1001, derivative_matrix_w)
+                    #derivative_matrix_w = np.where(derivative_matrix_w > -1/1001 and derivative_matrix_w < 0, -1/1001, derivative_matrix_w)
+                    
+                    w_new[-1-b] = w_new[-1-b] - self.learning_rate * derivative_matrix_w#更新参数
+
+                    #print(f'\nderivative_matrix_w{terminate}:{derivative_matrix_w}\nlearning rate:{self.learning_rate}\ndereva:{derivative_matrix_w}')
+
+                    derivative_matrix_x = data[-1-b][2].copy()
+                    h = derivative_matrix_x[0][0]
+                    a1 = np.shape(h )[0]
+                    a2 = np.shape(h )[1]
+                    error_derivative_matrix_x = np.zeros([a1,a2])
+                    m = 0
+                    while m < a1:
+                        n = 0
+                        while n < a2:
+
+                            
+                            derivative = np.sum(self.data_proccessed_y(fir) * derivative_matrix_x[:,:,m,n] )
+                            #print(f'self.data_proccessed_y(fir):{self.data_proccessed_y(fir)}\nderivative_matrix_x[:,:,m,n]{derivative_matrix_x[:,:,m,n]}')
+                            error_derivative_matrix_x[m][n] = derivative
+                            n = n + 1
+                        m = m + 1
+                    error_deri_of_x_bp = error_derivative_matrix_x#往前BP记录导数值
+                b = b + 1
+            #print(f'error_derivative_matrix_x:{error_derivative_matrix_x}')
+            if terminate% 1000 == 0:
+                print('学习次数：',terminate)
+                print(f'学习参数：{self.w}')
+            self.w = w_new
+            terminate = terminate + 1
 
 
         
 
 
-    def hidden_layer(self,x,w_matrix):#激活函数为sigmod函数的隐藏层,w_matrix为(feature+1)*unit_number
+    def hidden_layer(self,x,w_matrix):#激活函数为ReLu函数的隐藏层,w_matrix为(feature+1)*unit_number
+        
         x_matrix = self.data_proccessed_x(x)#x为n个样本*(feature + 1)
+
         z_matrix = x_matrix.dot(w_matrix)#对x线性变换后（n个样本） * （unit_number)
+        #print(f'x_matrix:{x_matrix}\nw_matrix:{w_matrix}\nz_matrix{z_matrix}')
+
         y_matrix = self.sigmod(z_matrix)
-        y_derivative_of_z = self.sigmod_derivatiwve(z_matrix)
+        y_derivative_of_z = self.sigmod_derivative(z_matrix)
         #求y对w和对x的导数：
         z_derivative_of_x_matrix = []
         z_ki_derivative_of_x_matrix = x_matrix.copy()
@@ -153,50 +275,31 @@ class MLP:
                             z_ki_derivative_of_w_matrix[m][n] = 0
                         else:
                             # print(f'm:{m},n:{n},k:{k}')
-                            # print(f'x_matrix:{x_matrix}\nw_matrix{w_matrix}\nz_matrix{z_matrix}')
+                            #print(f'x_matrix:{x_matrix}\nw_matrix{w_matrix}\nz_matrix{z_matrix}')
                             z_ki_derivative_of_w_matrix[m][n] = x_matrix[k][m]
                         n = n + 1
                     m = m + 1
+
                 y_derivative_of_w_matrix =  z_ki_derivative_of_w_matrix * y_derivative_of_z[k][i]
                 z1.append(y_derivative_of_w_matrix)
                 i = i + 1
             z_derivative_of_w_matrix.append(z1)
             k = k + 1
-        y_derivative_of_w_matrix = np.array(y_derivative_of_w_matrix)#数列转回数组
+        y_derivative_of_w_matrix = np.array(z_derivative_of_w_matrix)#数列转回数组
+        # #标准化处理（输出0,1拉伸处理
+        # print("y:",y_matrix)
+        # max = np.max(y_matrix)
+        # min = np.min(y_matrix)
+        # a = max - min
+        # b = y_matrix - min
+        # y_matrix = b / a 
+
+
+        #print(f'y_matrix:{y_matrix}\ny_derivative_of_w_matrix{y_derivative_of_w_matrix}\ny_derivative_of_x_matrix{y_derivative_of_x_matrix}')
         return([y_matrix,y_derivative_of_w_matrix,y_derivative_of_x_matrix])
         
 
-    def train_output_layer(self,x,t):#输出层（因为是二分类，所以输出层采用SIGMOD函数拟合概率）
-        self.data_proccessed_target(t)
-        error = math.inf
-        x = self.data_proccessed_x(x)
-        w = self.w[-1]
-        error_derivative_of_w = np.zeros([len(w)])
-        z_matrix = w.dot(x.T)
-        z_matrix = z_matrix.T#转置 
-        #y = 1/(1+np.exp(-z_matrix))
-        y = self.sigmod(z_matrix)
-        error_derivative_of_y = self.target_proccessed / (1-y) + (1 - self.target_proccessed) / y
-        y_derevative_of_z = self.sigmod_derivatiwve(z_matrix)
 
-        a = 0
-        y_derevative_of_x = []
-        while a < len(x):
-            y_derevative_of_x1 = w * y_derevative_of_z[a] * error_derivative_of_y[a]
-            y_derevative_of_x.append(y_derevative_of_x1)
-            a = a + 1
-        error_derivative_of_x = np.array(y_derevative_of_x)
-
-        error = self.error(np.array(y),np.array(self.target_proccessed))
-        k = 0
-        while k < len(w):
-            #regulazation = 10000*w[-1][k]
-            error_derivative_of_w[k] = np.sum(((y-1) + self.target_proccessed)* x[:,k])   #+ regulazation#正则化
-            k = k + 1
-        #参数更新：
-        self.w[-1] = w[-1] - self.learning_rate * error_derivative_of_w
-        return [y,error_derivative_of_w,error_derivative_of_x]
-    
     def error(self,y,t):
         
         error = -np.sum(t * np.log(1-y))/len(y) - np.sum((1-t) * np.log(y))/len(y)
@@ -204,46 +307,70 @@ class MLP:
         return error
     
 
-
     def predict(self,x):
+        x = x
+        print(x)
+        a = 0
+        
+        while a < self.hidden_layer_number:
+            #print(f'self.w{a}:',self.w[a])
+            x = self.hidden_layer(x,self.w[a])[0]
+            #print(f"预测值y{a}:{x}")
+            a = a + 1
+        result = self.predict_output_layer(x)
+        #print(f"预测值result:{result}")
+        return result
+
+
+    def predict_output_layer(self,x):
         x_matrix = self.data_proccessed_x(x)
         z_matrix = self.w[-1].dot(x_matrix.T)
         y = 1/(1+np.exp(-z_matrix))#指数处理
+        
+        print(f'预测x_matrix:{x_matrix}\n预测w:{self.w[-1]}\n预测z_matrix{z_matrix}\ny:{y}')
+        print(f'w:{self.w}')
+        print(f"预测值y:{y}")
         output = []
         for i in y:
             if i >= 0.5:
                 output.append(self.target_type[0])
             else:
                 output.append(self.target_type[1])
+        #print("self.target_type",self.target_type)
         return output
             
 
         
+#"C:\Users\86136\Desktop\杂物\人工智能与机器学习\作业\作业8\新建 文本文档.txt"
 
-
-
+#"C:\Users\86136\Desktop\杂物\人工智能与机器学习\作业\作业8\缩减集\optdigits.tra"
 filepath = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\新建 文本文档.txt"
-data = np.loadtxt(filepath,dtype = int,delimiter=',')
+#filepath = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\缩减集\\optdigits.tra"
+data = np.loadtxt(filepath,dtype = float,delimiter=',')
 x = data[:,0:-1]
 target = data[:,-1]
-a = 0
+MLP = MLP(1,[3],2,0.00002)
+MLP.train(x,target)
 
-MLP = MLP(2,[2,2],2,0.0000002)
 
-#MLP.train_output_layer(x,target)
-print(MLP.train(x,target))
 
+y = MLP.predict(x)
+print("训练集的预测值：\n",y)
+print("target值：",target)
+a = y - target
+wrong_number = np.sum(np.absolute(a))
+print("训练集的错误个数:",wrong_number)
+print("对于训练集的预测准确率：",(len(target)-wrong_number) / len(target))
 print('没bug结束啦哈哈哈')
-#y = MLP.predict(x)
-#print("训练集的预测值：\n",y)
-#a = y - target
-# wrong_number = np.sum(np.absolute(a))
-# print("对于训练集的预测准确率：",(len(target)-wrong_number) / len(target))
 
-# filepath2 = "C:\\Users\\86136\\Desktop\\杂物\\人工智能与机器学习\\作业\\作业8\\optdigits.tes"
-# data = np.loadtxt(filepath2,dtype = int,delimiter=',')
-# x = data[:,0:-1]
-# target = data[:,-1]
+# #自造数据：
+# c = np.random.randint(low=0, high=5, size=(10, 3))
+# t = np.ones([20])
+# t[0:10] = np.zeros([10])
+# d = np.random.randint(low=5, high=9, size=(10, 3))
+# x = np.vstack((c,d))
+# target = t
+
 # a = 0
 # for i in target:
 #     if i < 5 :
@@ -251,9 +378,4 @@ print('没bug结束啦哈哈哈')
 #     else:
 #         target[a] = 1
 #     a = a + 1
-# y = MLP.predict(x)
-# print("测试集的预测值：\n",y)
-# a = y - target
-# wrong_number = np.sum(np.absolute(a))
-# print("测试集的错误个数:",wrong_number)
-# print("对于测试集的预测准确率：",(len(target)-wrong_number) / len(target))
+# a = 0
